@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports: ["5432:5432"]
+    volumes:
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./auth-service/db/schema.sql:/schemas/auth.sql:ro
+      - ./metier-service/db/schema.sql:/schemas/metier.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 2s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    ports: ["5672:5672", "15672:15672"]   # AMQP, console d'administration (guest / guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4
+    ports: ["6379:6379"]
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/auth
+      ROLES_ADMIN: admin@exemple.fr
+    ports: ["3001:3001"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Service métier : dans n'importe quel langage, construit par son Dockerfile (voir README,
+  # « Contrat d'intégration »).
+  metier-service:
+    build: ./metier-service
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/metier
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://redis:6379
+    ports: ["3000:3000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      redis: { condition: service_started }

@@ -1,0 +1,6 @@
+# Lint des contrats OpenAPI : règles recommandées de Redocly.
+extends:
+  - recommended
+rules:
+  # Les contrats décrivent l'environnement de développement (localhost) : règle sans objet ici.
+  no-server-example.com: off

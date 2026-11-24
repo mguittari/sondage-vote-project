@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: Service métier
+  version: 0.1.0
+  description: Contrat à écrire avant le code (design-first).
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:3000
+    description: Environnement de développement (docker compose)
+tags:
+  - name: technique
+    description: Supervision
+paths:
+  /sante:
+    get:
+      tags: [technique]
+      operationId: sante
+      summary: Sonde de santé
+      security: []
+      responses:
+        "200":
+          description: Service opérationnel
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statut: { type: string, const: ok }
