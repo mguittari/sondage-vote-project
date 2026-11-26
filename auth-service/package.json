@@ -1,0 +1,33 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "test": "vitest run test/unit test/http",
+    "test:integration": "vitest run test/integration --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "test:architecture": "depcruise src --config .dependency-cruiser.cjs",
+    "lint:contrat": "redocly lint --config ../redocly.yaml openapi.yaml"
+  },
+  "dependencies": {
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
+    "@node-rs/argon2": "^2.2.2",
+    "fastify": "^5.12.7",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.64.1",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "dependency-cruiser": "^18.6.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
+  }
+}
