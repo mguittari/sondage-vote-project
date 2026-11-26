@@ -41,7 +41,7 @@ describe("Sondage.creer", () => {
     const sondage = unSondage();
 
     expect(sondage.id).toBe("s-001");
-    expect(sondage.question).toBe("Où organiser la cérémonie des tuterus ?");
+    expect(sondage.question).toBe("Où organiser la cérémonie des tuteurs ?");
     expect(sondage.options).toEqual(["Aix", "Marseille", "Toulon"]);
     expect(sondage.mode).toBe("unique");
     expect(sondage.votes).toEqual([]);
