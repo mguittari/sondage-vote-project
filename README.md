@@ -72,7 +72,7 @@ par schémas, bibliothèque JWT capable de lire un JWKS, client PostgreSQL, clie
 client Redis. Le lint du contrat OpenAPI reste celui de ce starter
 (`npx @redocly/cli lint`, ou l'image Docker `redocly/cli`).
 
-Le `metier-service` de ce starter sert aux binômes dont le service métier est en TypeScript, avec
+Le `metier-service` de ce starter sert aux groupes dont le service métier est en TypeScript, avec
 l'`auth-service` de ce starter ou de l'autre : les deux starters ont les mêmes services, les
 mêmes variables et le même `compose.yaml`.
 
