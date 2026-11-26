@@ -1,9 +1,3 @@
-export abstract class ErreurApplication extends Error {
-  abstract readonly code: string;
+import { ErreurDomaine } from "../domain/erreurs";
 
-  constructor(message: string) {
-    super(message);
-    this.name = new.target.name;
-  }
-}
-
+export abstract class ErreurApplication extends ErreurDomaine {}
