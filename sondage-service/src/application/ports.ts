@@ -5,6 +5,10 @@ export interface SondageRepository {
   enregistrer(sondage: Sondage): Promise<void>;
 }
 
+export interface AssociationRepository {
+  existe(id: string): Promise<boolean>;
+}
+
 export interface MembreRepository {
   appartientA(associationId: string, utilisateurId: string): Promise<boolean>;
 }
