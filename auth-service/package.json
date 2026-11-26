@@ -1,5 +1,5 @@
 {
-  "name": "metier-service",
+  "name": "auth-service",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,16 @@
     "test:architecture": "depcruise src --config .dependency-cruiser.cjs",
     "lint:contrat": "redocly lint --config ../redocly.yaml openapi.yaml"
   },
+  "dependencies": {
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
+    "@node-rs/argon2": "^2.2.2",
+    "fastify": "^5.12.7",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
   "devDependencies": {
     "@redocly/cli": "^2.64.1",
     "@types/node": "^22.20.5",
@@ -19,15 +29,5 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5"
-  },
-  "dependencies": {
-    "@fastify/swagger": "^9.9.2",
-    "@fastify/swagger-ui": "^6.1.2",
-    "amqplib": "^2.2.0",
-    "fastify": "^5.12.7",
-    "ioredis": "^6.0.0",
-    "jose": "^6.2.12",
-    "pg": "^8.23.1",
-    "zod": "^4.6.7"
   }
 }
