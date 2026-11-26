@@ -1,87 +1,135 @@
-# Starter TypeScript - projet fil rouge
+# Sondages pour associations
 
-Point de départ du projet : deux microservices (`auth-service`, `metier-service`), PostgreSQL,
-RabbitMQ et Redis sous Docker Compose. Renommez `metier-service` d'après votre sujet (dossier,
-`package.json`, `compose.yaml`).
+Le projet comprend deux services TypeScript : `auth-service` pour les comptes et
+`sondage-service` pour les sondages liés à une association. Les membres d'une
+association peuvent voter à ses sondages.
 
-## Prérequis
+## État du projet et référents
 
-Node.js 22, Docker et Docker Compose, Git ; la chaîne d'outils du langage de votre service métier.
+| Composant | Référent | État actuel |
+|---|---|---|
+| Authentification (`auth-service`) | Enzo | Inscription HTTP avec hachage Argon2id et stockage PostgreSQL. Connexion et jetons à construire. |
+| Domaine du sondage (`Sondage`, `Vote`) | Svetlana | Agrégat, période de vote et règles métier. |
+| Domaine des associations et périodes | Enzo et Mattias | `Association` et `PeriodeSondage`. |
+| Cas d'usage et ports (`sondage-service/application`) | Mattias | `CreerSondage`, `Voter`, ports et erreurs d'application. |
+| Repository en mémoire (`sondage-service/infrastructure/memoire`) | Mattias | Stockage de copies des sondages. |
+| HTTP du service sondage (`sondage-service/infrastructure/http`) | Mattias | Route `/sante` et documentation OpenAPI minimale ; création et vote non encore exposés. |
 
-## Démarrer
+## Lancer les tests
+
+Prérequis : Node.js 22 et npm. Les tests unitaires et HTTP n'utilisent pas
+Docker.
 
 ```bash
-git init && git add -A && git commit -m "chore: starter"
-(cd auth-service && npm install)
-(cd metier-service && npm install)
-docker compose up -d --build
-curl http://localhost:3000/sante          # {"statut":"ok"}
-open http://localhost:3000/docs           # Swagger UI du contrat openapi.yaml
+cd sondage-service
+npm install
+npm test
+npm run typecheck
+npm run test:architecture
 ```
 
-## Commandes (dans chaque service)
+`npm test` exécute les tests du domaine, des deux cas d'usage, du repository en
+mémoire et de la route de santé. Les tests de `CreerSondage` et `Voter` utilisent
+`SondageRepositoryMemoire` et des identifiants prévisibles ; `Voter` utilise
+aussi une horloge fixe. Ils couvrent le cas nominal, les invariants violés et
+les ressources introuvables. Dernière vérification : 40 tests verts sans Docker.
+La durée affichée par Vitest a varié de 835 ms à 1,15 s selon l'exécution.
+
+Pour tester `auth-service` séparément :
+
+```bash
+cd auth-service
+npm install
+npm test
+```
+
+Pour lancer les services et leurs dépendances :
+
+```bash
+docker compose up -d --build
+```
+
+Le service sondage expose actuellement `GET http://localhost:3000/sante` et
+`http://localhost:3000/docs`. Le service d'authentification écoute sur le port
+3001. Les tests d'intégration nécessitant PostgreSQL, RabbitMQ ou Redis se
+lancent avec `npm run test:integration` dans le service concerné.
+
+## Couches du service sondage
+
+```mermaid
+flowchart LR
+  subgraph Infrastructure["infrastructure/"]
+    Memoire["SondageRepositoryMemoire"]
+    HTTP["app.ts : /sante"]
+  end
+  subgraph Application["application/"]
+    Creer["CreerSondage"]
+    Voter["Voter"]
+    SondageRepo["Interface SondageRepository"]
+    AssociationRepo["Interface AssociationRepository"]
+    MembreRepo["Interface MembreRepository"]
+    GenId["Interface GenerateurId"]
+    Horloge["Interface Horloge"]
+    ErreurApp["ErreurApplication"]
+  end
+  subgraph Domaine["domain/"]
+    Sondage["Sondage"]
+    Vote["Interface Vote"]
+    Periode["PeriodeSondage"]
+    Association["Association"]
+    ErreurDom["ErreurDomaine"]
+  end
+
+  Memoire -->|implémente| SondageRepo
+  Creer --> SondageRepo
+  Creer --> AssociationRepo
+  Creer --> GenId
+  Voter --> SondageRepo
+  Voter --> MembreRepo
+  Voter --> GenId
+  Voter --> Horloge
+  Creer --> Sondage
+  Voter --> Sondage
+  Sondage --> Vote
+  Sondage --> Periode
+  Sondage --> ErreurDom
+  ErreurApp --> ErreurDom
+```
+
+Les flèches représentent les dépendances du code : `infrastructure` dépend des
+ports d'`application`, et `application` utilise les objets de `domain`. Le
+domaine ne dépend d'aucune autre couche.
+
+| Couche | Autres classes et interfaces présentes |
+|---|---|
+| `domain/` | Interfaces `SondageProps` et `AssociationRepository` (locale, non utilisée) ; classes `QuestionVide`, `OptionsInsuffisantes`, `OptionsEnDouble`, `SondageHorsPeriode`, `DejaVote`, `BulletinVide`, `OptionInconnue`, `ChoixEnDouble`, `ChoixUniqueDepasse`. Types `NouveauSondage` et `ModeDeChoix`. |
+| `application/` | Classes `AssociationIntrouvable`, `SondageIntrouvable` et `MembreRequis`, définies près des cas d'usage qui les déclenchent. |
+| `infrastructure/` | `construireApp` dans `http/app.ts` est une fonction, pas une classe ; le repository en mémoire est la seule classe d'infrastructure du sondage actuellement. |
+
+Le module HTTP du service sondage n'est pas encore relié aux cas d'usage.
+`AssociationRepository` et `MembreRepository` n'ont pas encore d'implémentation
+concrète dans ce service. `Association.ts` contient aussi une interface locale
+`AssociationRepository` non utilisée ; le port employé par `CreerSondage` est
+celui d'`application/ports.ts`.
+
+`SondageRepositoryMemoire` fait une copie à chaque lecture et enregistrement :
+modifier un sondage chargé ne modifie pas la version stockée avant l'appel à
+`enregistrer`. Ce stockage est temporaire ; l'adaptateur PostgreSQL du sondage
+reste à écrire. Le schéma SQL du service sondage est encore un emplacement vide.
+
+## Contrats et commandes utiles
 
 | Commande | Rôle |
 |---|---|
-| `npm test` | tests unitaires et HTTP (sans base de données) |
-| `npm run test:integration` | tests des adapters contre PostgreSQL, RabbitMQ et Redis (`docker compose up -d postgres rabbitmq redis`) |
-| `npm run test:architecture` | vérifie la règle de dépendance entre couches (dependency-cruiser) |
-| `npm run lint:contrat` | vérifie le contrat OpenAPI (Redocly) |
-| `npm run typecheck` | vérification des types TypeScript |
-| `npm run dev` | lance le service en local avec rechargement automatique |
+| `npm test` | Tests unitaires et HTTP, sans Docker |
+| `npm run typecheck` | Vérification des types TypeScript |
+| `npm run test:architecture` | Vérification du sens des dépendances entre couches |
+| `npm run lint:contrat` | Validation du contrat OpenAPI |
+| `npm run test:integration` | Tests avec les dépendances réelles, si présents |
 
-## Organisation du code
+Le contrat de communication prévu entre services est HTTP/OpenAPI ; les variables de
+connexion à PostgreSQL, RabbitMQ et Redis sont définies dans `compose.yaml`.
+Après une modification de `db/schema.sql` sur une base locale jetable, recréer
+les volumes Docker pour appliquer le nouveau schéma.
 
-```
-<service>/src/
-  domain/          entités, value objects, erreurs métier : aucun import technique
-  application/     cas d'usage et ports (interfaces) dont ils ont besoin
-  infrastructure/  adapters : implémentations des ports (HTTP, PostgreSQL, RabbitMQ, Redis...)
-  main.ts          composition root : crée les adapters et les injecte
-<service>/test/
-  unit/            domaine et cas d'usage, avec doublures (unit/doublures.ts)
-  http/            adapter HTTP via app.inject(), sans base
-  integration/     adapters contre les vrais PostgreSQL, RabbitMQ et Redis
-```
-
-Les dépendances vont de `infrastructure` vers `application` vers `domain`, jamais l'inverse.
-
-## Système polyglotte et contrat d'intégration
-
-Votre système compte **au moins deux langages**. `auth-service` reste en TypeScript (celui de ce
-starter) ; le service métier et le worker sont dans le langage de votre choix, validé en
-séance 1 ; si le service métier est aussi en TypeScript, le worker est dans un autre langage. Les services ne partagent que des contrats : HTTP décrit par OpenAPI, JWT (JSON Web
-Token) vérifié par JWKS (JSON Web Key Set), événements RabbitMQ décrits par un schéma JSON.
-
-Un service, quel que soit son langage, s'intègre au système s'il respecte ce contrat :
-
-| Élément | Valeur dans `compose.yaml` | À partir de |
-|---|---|---|
-| Image | construite par le `Dockerfile` du dossier du service | TP-02 |
-| Port | écoute sur `3000` dans le conteneur ; `GET /sante` répond `200` | TP-02 |
-| `DATABASE_URL` | `postgres://app:app@postgres:5432/metier` (schéma : `db/schema.sql`) | TP-02 |
-| `JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE` | `http://auth-service:3001/.well-known/jwks.json`, émetteur et audience choisis au TP-04 | TP-04 |
-| `AMQP_URL` | `amqp://guest:guest@rabbitmq:5672/` | TP-05 |
-| `REDIS_URL` | `redis://redis:6379` | TP-06 |
-
-Pour écrire le service métier dans un autre langage : remplacez le contenu du dossier
-`metier-service` par votre projet (avec son `Dockerfile`), gardez les variables
-ci-dessus (et le nom du service dans `compose.yaml`, s'il est renommé). Vous fournissez vous-mêmes l'outillage équivalent
-de votre langage : tests unitaires, test automatisé de la règle de dépendance, validation
-par schémas, bibliothèque JWT capable de lire un JWKS, client PostgreSQL, client RabbitMQ,
-client Redis. Le lint du contrat OpenAPI reste celui de ce starter
-(`npx @redocly/cli lint`, ou l'image Docker `redocly/cli`).
-
-Le `metier-service` de ce starter sert aux groupes dont le service métier est en TypeScript, avec
-l'`auth-service` de ce starter ou de l'autre : les deux starters ont les mêmes services, les
-mêmes variables et le même `compose.yaml`.
-
-## État fourni
-
-- `metier-service` : couches vides, route `/sante`, contrat OpenAPI minimal, outillage complet.
-- `auth-service` : inscription (`POST /auth/inscription`), mots de passe hachés en Argon2id,
-  erreurs au format Problem Details. Connexion, jetons et refresh tokens sont à construire.
-- `docs/adr/gabarit.md` : modèle pour vos ADR (Architecture Decision Records).
-- `IA.md` : déclaration d'usage des assistants d'IA (intelligence artificielle), à tenir à jour.
-
-Après toute modification d'un fichier `db/schema.sql` : `docker compose down -v && docker compose up -d`.
+L'usage de l'assistant d'IA est consigné dans [IA.md](IA.md).
