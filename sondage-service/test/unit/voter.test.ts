@@ -7,13 +7,15 @@ import {
   SondageHorsPeriode,
 } from "../../src/domain/sondage";
 import { MembreRequis, SondageIntrouvable, Voter } from "../../src/application/voter";
+import { SondageRepositoryMemoire } from "../../src/infrastructure/memoire/sondage-repository-memoire";
 import { HorlogeFixe, IdsSequentiels } from "./doublures";
 
 const maintenant = new Date("2026-12-05T10:00:00Z");
 const commande = { sondageId: "sondage-1", votantId: "membre-1", choix: ["Aix"] };
 
-function contexte(date = maintenant) {
-  let sondage: Sondage | null = Sondage.creer({
+async function contexte(date = maintenant, avecSondage = true) {
+  const sondages = new SondageRepositoryMemoire();
+  const sondage: Sondage = Sondage.creer({
     id: "sondage-1",
     question: "Où se réunir ?",
     options: ["Aix", "Toulon"],
@@ -25,13 +27,10 @@ function contexte(date = maintenant) {
     associationId: "association-1",
     createurId: "createur-1",
   });
+  if (avecSondage) await sondages.enregistrer(sondage);
   let membre = true;
-  let enregistrements = 0;
   const usage = new Voter(
-    {
-      trouverParId: async () => sondage,
-      enregistrer: async () => { enregistrements++; },
-    },
+    sondages,
     { appartientA: async (associationId, utilisateurId) =>
       membre && associationId === "association-1" && utilisateurId === "membre-1" },
     new IdsSequentiels("vote"),
@@ -39,16 +38,14 @@ function contexte(date = maintenant) {
   );
   return {
     usage,
-    get sondage() { return sondage; },
-    get enregistrements() { return enregistrements; },
-    sansSondage: () => { sondage = null; },
+    sondages,
     sansAdhesion: () => { membre = false; },
   };
 }
 
 describe("Voter", () => {
   it("enregistre le vote d'un membre dans le sondage de son association", async () => {
-    const contexteVote = contexte();
+    const contexteVote = await contexte();
 
     const vote = await contexteVote.usage.executer(commande);
 
@@ -58,44 +55,40 @@ describe("Voter", () => {
       options: ["Aix"],
       le: maintenant,
     });
-    expect(contexteVote.sondage?.votes).toEqual([vote]);
-    expect(contexteVote.enregistrements).toBe(1);
+    expect((await contexteVote.sondages.trouverParId(commande.sondageId))?.votes).toEqual([vote]);
   });
 
   it("refuse un sondage introuvable", async () => {
-    const contexteVote = contexte();
-    contexteVote.sansSondage();
+    const contexteVote = await contexte(maintenant, false);
     await expect(contexteVote.usage.executer(commande)).rejects.toThrow(SondageIntrouvable);
-    expect(contexteVote.enregistrements).toBe(0);
+    expect(await contexteVote.sondages.trouverParId(commande.sondageId)).toBeNull();
   });
 
   it("refuse un utilisateur qui n'est pas membre de l'association", async () => {
-    const contexteVote = contexte();
+    const contexteVote = await contexte();
     contexteVote.sansAdhesion();
     await expect(contexteVote.usage.executer(commande)).rejects.toThrow(MembreRequis);
-    expect(contexteVote.sondage?.votes).toHaveLength(0);
-    expect(contexteVote.enregistrements).toBe(0);
+    expect((await contexteVote.sondages.trouverParId(commande.sondageId))?.votes).toHaveLength(0);
   });
 
   it("laisse le domaine refuser un sondage fermé", async () => {
-    const contexteVote = contexte(new Date("2026-12-10T00:00:00Z"));
+    const contexteVote = await contexte(new Date("2026-12-10T00:00:00Z"));
     await expect(contexteVote.usage.executer(commande)).rejects.toThrow(SondageHorsPeriode);
-    expect(contexteVote.enregistrements).toBe(0);
+    expect((await contexteVote.sondages.trouverParId(commande.sondageId))?.votes).toHaveLength(0);
   });
 
   it("laisse le domaine refuser une option inconnue", async () => {
-    const contexteVote = contexte();
+    const contexteVote = await contexte();
     await expect(contexteVote.usage.executer({ ...commande, choix: ["Nice"] }))
       .rejects.toThrow(OptionInconnue);
-    expect(contexteVote.enregistrements).toBe(0);
+    expect((await contexteVote.sondages.trouverParId(commande.sondageId))?.votes).toHaveLength(0);
   });
 
   it("laisse le domaine refuser un second vote du même membre", async () => {
-    const contexteVote = contexte();
+    const contexteVote = await contexte();
     await contexteVote.usage.executer(commande);
     await expect(contexteVote.usage.executer({ ...commande, choix: ["Toulon"] }))
       .rejects.toThrow(DejaVote);
-    expect(contexteVote.sondage?.votes).toHaveLength(1);
-    expect(contexteVote.enregistrements).toBe(1);
+    expect((await contexteVote.sondages.trouverParId(commande.sondageId))?.votes).toHaveLength(1);
   });
 });
