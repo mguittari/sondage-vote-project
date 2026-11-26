@@ -1,11 +1,14 @@
 import type { Vote } from "../domain/sondage";
+import { ErreurApplication } from "./erreurs";
 import type { GenerateurId, Horloge, MembreRepository, SondageRepository } from "./ports";
 
-export class SondageIntrouvable extends Error {
+export class SondageIntrouvable extends ErreurApplication {
+  readonly code = "sondage-introuvable";
   constructor() { super("Sondage introuvable"); }
 }
 
-export class MembreRequis extends Error {
+export class MembreRequis extends ErreurApplication {
+  readonly code = "membre-requis";
   constructor() { super("Le vote est réservé aux membres de l'association"); }
 }
 
