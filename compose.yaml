@@ -8,7 +8,7 @@ services:
     volumes:
       - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
       - ./auth-service/db/schema.sql:/schemas/auth.sql:ro
-      - ./sondage-service/db/schema.sql:/schemas/sondage.sql:ro
+      - ./metier-service/db/schema.sql:/schemas/metier.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 2s
@@ -37,8 +37,8 @@ services:
 
   # Service métier : dans n'importe quel langage, construit par son Dockerfile (voir README,
   # « Contrat d'intégration »).
-  sondage-service:
-    build: ./sondage-service
+  metier-service:
+    build: ./metier-service
     environment:
       DATABASE_URL: postgres://app:app@postgres:5432/metier
       AMQP_URL: amqp://guest:guest@rabbitmq:5672/
