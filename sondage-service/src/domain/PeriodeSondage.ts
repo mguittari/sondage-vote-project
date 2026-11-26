@@ -1,4 +1,4 @@
-export class PeriodeOuverture {
+export class PeriodeSondage {
 
     private readonly debut: Date;
     private readonly fin: Date;
@@ -31,7 +31,7 @@ export class PeriodeOuverture {
         return date >= this.debut && date < this.fin;
     }
 
-    equals(autre: PeriodeOuverture): boolean {
+    equals(autre: PeriodeSondage): boolean {
         return (
             this.debut.getTime() === autre.debut.getTime() &&
             this.fin.getTime() === autre.fin.getTime()
