@@ -9,9 +9,15 @@ info:
 servers:
   - url: http://localhost:3000
     description: Environnement de développement (docker compose)
+security:
+  - BearerAuth: []
 tags:
   - name: technique
     description: Supervision
+  - name: sondages
+    description: Création et consultation des sondages
+  - name: votes
+    description: Votes sur les sondages
 paths:
   /sante:
     get:
@@ -28,3 +34,199 @@ paths:
                 type: object
                 properties:
                   statut: { type: string, const: ok }
+  /sondages:
+    post:
+      tags: [sondages]
+      operationId: creerSondage
+      summary: Créer un sondage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NouveauSondage" }
+      responses:
+        "201":
+          description: Sondage créé
+          headers:
+            Location:
+              description: URI du sondage créé, par exemple /sondages/{id}
+              schema: { type: string, format: uri-reference }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sondage" }
+        "400": { $ref: "#/components/responses/Probleme" }
+        "422": { $ref: "#/components/responses/Probleme" }
+    get:
+      tags: [sondages]
+      operationId: listerSondages
+      summary: Lister les sondages d'une association
+      parameters:
+        - name: associationId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limite
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: curseur
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Page de sondages
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sondages]
+                properties:
+                  sondages:
+                    type: array
+                    items: { $ref: "#/components/schemas/Sondage" }
+                  prochainCurseur: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/Probleme" }
+  /sondages/{id}:
+    get:
+      tags: [sondages]
+      operationId: consulterSondage
+      summary: Consulter un sondage
+      parameters:
+        - $ref: "#/components/parameters/SondageId"
+      responses:
+        "200":
+          description: Sondage trouvé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sondage" }
+        "404": { $ref: "#/components/responses/Probleme" }
+  /sondages/{id}/resultats:
+    get:
+      tags: [sondages]
+      operationId: consulterResultatsSondage
+      summary: Consulter les résultats d'un sondage
+      parameters:
+        - $ref: "#/components/parameters/SondageId"
+      responses:
+        "200":
+          description: Résultats du sondage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultatsSondage" }
+        "404": { $ref: "#/components/responses/Probleme" }
+  /sondages/{id}/votes:
+    post:
+      tags: [votes]
+      operationId: voter
+      summary: Voter dans un sondage
+      parameters:
+        - $ref: "#/components/parameters/SondageId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NouveauVote" }
+      responses:
+        "201":
+          description: Vote enregistré
+          headers:
+            Location:
+              description: URI du vote créé, par exemple /sondages/{id}/votes/{voteId}
+              schema: { type: string, format: uri-reference }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vote" }
+        "400": { $ref: "#/components/responses/Probleme" }
+        "404": { $ref: "#/components/responses/Probleme" }
+        "409": { $ref: "#/components/responses/Probleme" }
+        "422": { $ref: "#/components/responses/Probleme" }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SondageId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Probleme:
+      description: Erreur au format Problem Details
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Probleme" }
+  schemas:
+    PeriodeSondage:
+      type: object
+      required: [debut, fin]
+      properties:
+        debut: { type: string, format: date-time }
+        fin: { type: string, format: date-time }
+    NouveauSondage:
+      type: object
+      required: [question, options, mode, periode, associationId, createurId]
+      properties:
+        question: { type: string, minLength: 1 }
+        options:
+          type: array
+          minItems: 2
+          uniqueItems: true
+          items: { type: string }
+        mode: { type: string, enum: [unique, multiple] }
+        periode: { $ref: "#/components/schemas/PeriodeSondage" }
+        associationId: { type: string }
+        createurId: { type: string }
+    Sondage:
+      allOf:
+        - $ref: "#/components/schemas/NouveauSondage"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string }
+    ResultatsSondage:
+      type: object
+      required: [sondageId, nombreVotes, options]
+      properties:
+        sondageId: { type: string }
+        nombreVotes:
+          type: integer
+          minimum: 0
+          description: Nombre de bulletins enregistrés
+        options:
+          type: array
+          description: Nombre de choix reçus par option
+          items:
+            type: object
+            required: [option, nombreChoix]
+            properties:
+              option: { type: string }
+              nombreChoix: { type: integer, minimum: 0 }
+    NouveauVote:
+      type: object
+      required: [votantId, options]
+      properties:
+        votantId: { type: string }
+        options:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+    Vote:
+      allOf:
+        - $ref: "#/components/schemas/NouveauVote"
+        - type: object
+          required: [id, le]
+          properties:
+            id: { type: string }
+            le: { type: string, format: date-time }
+    Probleme:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
