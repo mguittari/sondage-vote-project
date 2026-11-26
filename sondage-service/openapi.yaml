@@ -47,6 +47,10 @@ paths:
       responses:
         "201":
           description: Sondage créé
+          headers:
+            Location:
+              description: URI du sondage créé, par exemple /sondages/{id}
+              schema: { type: string, format: uri-reference }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Sondage" }
@@ -124,6 +128,10 @@ paths:
       responses:
         "201":
           description: Vote enregistré
+          headers:
+            Location:
+              description: URI du vote créé, par exemple /sondages/{id}/votes/{voteId}
+              schema: { type: string, format: uri-reference }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Vote" }
